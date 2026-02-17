@@ -1,0 +1,21 @@
+  # Java
+  *.class
+  *.jar
+  *.war
+  *.ear
+  target/
+  out/
+
+  # IDE
+  .idea/
+  *.iml
+  *.iws
+  *.ipr
+  .vscode/
+
+  # OS
+  .DS_Store
+  Thumbs.db
+
+  # Logs
+  *.log
