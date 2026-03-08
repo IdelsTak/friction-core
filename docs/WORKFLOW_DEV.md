@@ -49,6 +49,26 @@ What it does:
    - `release.yml`
    - `publish.yml`
 
+## PR Checks and Label Policy
+
+`friction-core` PR validation is defined in `.github/workflows/ci.yml` and exposes these stable check names:
+
+- `build-and-test`
+- `version-label-check`
+
+Branch protection should require both checks.
+
+Version labels enforced by `version-label-check`:
+
+- Exactly one impact label is required:
+  - `version:major`
+  - `version:minor`
+  - `version:patch`
+- At most one pre-release label is allowed:
+  - `version:alpha`
+  - `version:beta`
+  - `version:rc`
+
 ## Notes
 
 - The script is non-destructive and fast-fails on first error.
