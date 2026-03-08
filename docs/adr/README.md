@@ -10,3 +10,4 @@ Architecture Decision Records (ADRs) are the primary decision log for shared Fri
 - [ADR-0004 Read Model Interfaces as Pluggable Contracts](./ADR-0004-read-model-pluggable-interfaces.md)
 - [ADR-0005 Label-Driven Versioning Policy](./ADR-0005-label-driven-versioning.md)
 - [ADR-0006 Observation Clustering Strategy](./ADR-0006-observation-clustering-strategy.md)
+- [ADR-0007 Metrics Semantics and Edge-Case Policy](./ADR-0007-metrics-semantics-and-edge-cases.md)
