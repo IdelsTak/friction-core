@@ -7,8 +7,7 @@ name: Release
       - master
 
 permissions:
-  contents: write
-  pull-requests: read
+  contents: read
 
 concurrency:
   group: release-master
@@ -19,6 +18,13 @@ jobs:
     name: release
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: read
+    outputs:
+      next_tag: ${{ steps.version.outputs.next_tag }}
+      next_version: ${{ steps.version.outputs.next_version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
 
     steps:
       - name: Checkout
@@ -344,3 +350,49 @@ jobs:
           body: ${{ steps.changelog.outputs.body }}
           target_commitish: ${{ github.sha }}
           prerelease: ${{ steps.version.outputs.prerelease }}
+
+  publish:
+    name: publish
+    needs:
+      - release
+    if: startsWith(needs.release.outputs.next_tag, 'v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.next_tag }}
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          server-id: github
+          settings-path: ${{ github.workspace }}
+
+      - name: Set release version
+        run: |
+          set -euo pipefail
+          version="${{ needs.release.outputs.next_version }}"
+          mvn -B -ntp versions:set \
+            -DnewVersion="${version}" \
+            -DgenerateBackupPoms=false
+
+      - name: Publish Maven package to GitHub Packages
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          repo_url="https://maven.pkg.github.com/${{ github.repository }}"
+          deploy_repo="github::default::${repo_url}"
+          mvn -B -ntp deploy \
+            -DskipTests \
+            -DaltDeploymentRepository="${deploy_repo}"

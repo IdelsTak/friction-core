@@ -47,22 +47,18 @@ What it does:
 4. Runs `act` dry-run smoke checks for key workflows if present:
    - `ci.yml`
    - `release.yml`
-   - `publish.yml`
 
 ## Release and Publish Workflows
 
-`friction-core` release automation workflows:
+`friction-core` release automation workflow:
 
 - `.github/workflows/release.yml`
   - Trigger: push to `master`
   - Behavior: resolve merged PR labels, compute semver tag, generate changelog,
-    create GitHub Release
-  - Permissions: `contents: write`, `pull-requests: read`
-- `.github/workflows/publish.yml`
-  - Trigger: `release.published`
-  - Behavior: set Maven project version from release tag and publish to GitHub
-    Packages
-  - Permissions: `contents: read`, `packages: write`
+    create GitHub Release, then publish Maven package to GitHub Packages
+  - Jobs and permissions:
+    - `release`: `contents: write`, `pull-requests: read`
+    - `publish`: `contents: read`, `packages: write`
 
 ## PR Checks and Label Policy
 
@@ -99,3 +95,18 @@ The same label constraints are enforced again during `release.yml` execution.
 - If `.github/workflows` does not exist yet, the script exits successfully with a skip message.
 - `act` dry-run validates workflow wiring without full execution.
 - Before merge, still run a real GitHub-hosted workflow execution for runner parity.
+
+## Troubleshooting
+
+Symptom:
+
+- GitHub Release is created but a separate publish workflow shows no runs.
+
+Cause:
+
+- `GITHUB_TOKEN`-created events do not reliably trigger downstream workflows.
+
+Resolution:
+
+- Use unified release + publish jobs in `release.yml` (current model), or use a
+  tag-push trigger strategy if workflows must remain split.
