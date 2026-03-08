@@ -1,0 +1,99 @@
+---
+name: CI
+
+'on':
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+      - labeled
+      - unlabeled
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: build-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build and test
+        run: mvn -B -ntp verify
+
+  version-label-check:
+    name: version-label-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate version labels on PR
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          labels_json="$(
+            jq -c '[.pull_request.labels[].name]' "$GITHUB_EVENT_PATH"
+          )"
+          echo "PR labels: $labels_json"
+
+          has_major="$(
+            jq -r 'index("version:major") != null' <<< "$labels_json"
+          )"
+          has_minor="$(
+            jq -r 'index("version:minor") != null' <<< "$labels_json"
+          )"
+          has_patch="$(
+            jq -r 'index("version:patch") != null' <<< "$labels_json"
+          )"
+
+          has_alpha="$(
+            jq -r 'index("version:alpha") != null' <<< "$labels_json"
+          )"
+          has_beta="$(
+            jq -r 'index("version:beta") != null' <<< "$labels_json"
+          )"
+          has_rc="$(
+            jq -r 'index("version:rc") != null' <<< "$labels_json"
+          )"
+
+          impact_count=0
+          prerelease_count=0
+
+          [[ "$has_major" == "true" ]] && impact_count=$((impact_count + 1))
+          [[ "$has_minor" == "true" ]] && impact_count=$((impact_count + 1))
+          [[ "$has_patch" == "true" ]] && impact_count=$((impact_count + 1))
+
+          if [[ "$has_alpha" == "true" ]]; then
+            prerelease_count=$((prerelease_count + 1))
+          fi
+          if [[ "$has_beta" == "true" ]]; then
+            prerelease_count=$((prerelease_count + 1))
+          fi
+          if [[ "$has_rc" == "true" ]]; then
+            prerelease_count=$((prerelease_count + 1))
+          fi
+
+          if [[ "$impact_count" -ne 1 ]]; then
+            echo "Expected exactly one impact label:"
+            echo "version:major | version:minor | version:patch"
+            exit 1
+          fi
+
+          if [[ "$prerelease_count" -gt 1 ]]; then
+            echo "Expected at most one prerelease label:"
+            echo "version:alpha | version:beta | version:rc"
+            exit 1
+          fi
+
+          echo "Version label policy check passed"
