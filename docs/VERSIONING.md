@@ -41,13 +41,23 @@ Releases are guided by PR labels and automated on merge to `master`.
 
 ## Publishing
 
-- `publish.yml` runs on `release.published`.
+- Publishing is executed in the `publish` job inside `release.yml`.
+- `publish` runs only after successful semantic version resolution and release creation.
 - Publishes `friction-core` Maven artifact to GitHub Packages using `GITHUB_TOKEN`.
 
 ## Workflow Permissions
 
-- `release.yml`: `contents: write`, `pull-requests: read`
-- `publish.yml`: `contents: read`, `packages: write`
+- `release.yml` / `release` job: `contents: write`, `pull-requests: read`
+- `release.yml` / `publish` job: `contents: read`, `packages: write`
+
+## Trigger Rationale
+
+- GitHub does not trigger downstream workflows from events created by
+  `GITHUB_TOKEN` (anti-recursion guard).
+- Because releases are created by `release.yml` using `GITHUB_TOKEN`, standalone
+  `on: release` publish workflows may not run.
+- Unified release + publish in `release.yml` ensures deterministic package
+  publication on every valid release.
 
 ## Examples
 
