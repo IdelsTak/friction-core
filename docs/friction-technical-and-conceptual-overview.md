@@ -225,7 +225,7 @@ sequenceDiagram
 * **Merge Strategy:** Defined in `MERGE_SPLIT_POLICY.md` and governed by `ADR-0009`.
 * **Metrics Calculation Details:** Defined in `METRICS_SEMANTICS.md` and governed by `ADR-0007`.
 * **Security & Access Control:** Defined in `SECURITY_ACCESS_CONTROL.md` and governed by `ADR-0010`.
-* **Scalability and Performance:** While horizontal scaling is assumed, specific strategies for data partitioning, high-volume ingestion, and efficient clustering are not defined.
+* **Scalability and Performance:** Defined in `SCALABILITY_PARTITIONING.md` and governed by `ADR-0011`.
 
 ## 9. Recommended Java Project Structure
 
