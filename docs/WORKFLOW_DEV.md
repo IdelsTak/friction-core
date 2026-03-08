@@ -49,6 +49,21 @@ What it does:
    - `release.yml`
    - `publish.yml`
 
+## Release and Publish Workflows
+
+`friction-core` release automation workflows:
+
+- `.github/workflows/release.yml`
+  - Trigger: push to `master`
+  - Behavior: resolve merged PR labels, compute semver tag, generate changelog,
+    create GitHub Release
+  - Permissions: `contents: write`, `pull-requests: read`
+- `.github/workflows/publish.yml`
+  - Trigger: `release.published`
+  - Behavior: set Maven project version from release tag and publish to GitHub
+    Packages
+  - Permissions: `contents: read`, `packages: write`
+
 ## PR Checks and Label Policy
 
 `friction-core` PR validation is defined in `.github/workflows/ci.yml` and exposes these stable check names:
@@ -68,6 +83,15 @@ Version labels enforced by `version-label-check`:
   - `version:alpha`
   - `version:beta`
   - `version:rc`
+
+The same label constraints are enforced again during `release.yml` execution.
+
+## Artifact Retention
+
+- CI debug artifacts use explicit short retention:
+  - `ci.yml` upload step sets `retention-days: 1`
+- No long-lived workflow artifacts are retained for non-release runs.
+- Long-lived distributables are published as GitHub Releases and GitHub Packages.
 
 ## Notes
 

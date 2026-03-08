@@ -1,0 +1,53 @@
+---
+name: Publish Package
+
+'on':
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          server-id: github
+          settings-path: ${{ github.workspace }}
+
+      - name: Set release version
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          mvn -B -ntp versions:set \
+            -DnewVersion="${version}" \
+            -DgenerateBackupPoms=false
+
+      - name: Publish Maven package to GitHub Packages
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          repo_url="https://maven.pkg.github.com/${{ github.repository }}"
+          deploy_repo="github::default::${repo_url}"
+          mvn -B -ntp deploy \
+            -DskipTests \
+            -DaltDeploymentRepository="${deploy_repo}"

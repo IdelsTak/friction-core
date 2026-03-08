@@ -33,6 +33,17 @@ jobs:
       - name: Build and test
         run: mvn -B -ntp verify
 
+      - name: Upload CI debug reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-debug-reports
+          path: |
+            target/surefire-reports/**
+            target/failsafe-reports/**
+          if-no-files-found: ignore
+          retention-days: 1
+
   version-label-check:
     name: version-label-check
     runs-on: ubuntu-latest
