@@ -7,6 +7,7 @@ This directory is the single source of truth for shared product, domain, and arc
 - [Technical and Conceptual Overview](./friction-technical-and-conceptual-overview.md)
 - [SPI Contract](./SPI.md)
 - [Read Model Contract](./READ_MODELS.md)
+- [Observation Clustering Strategy](./OBSERVATION_CLUSTERING.md)
 - [Repo Boundaries](./REPO_BOUNDARIES.md)
 - [Versioning Policy](./VERSIONING.md)
 - [Decision Records Index](./adr/README.md)
