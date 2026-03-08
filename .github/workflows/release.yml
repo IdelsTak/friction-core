@@ -204,7 +204,6 @@ jobs:
               process.env.PREVIOUS_TAG_EXISTS === "true"
             );
             const prNumber = process.env.PR_NUMBER;
-            const prTitle = process.env.PR_TITLE;
             const nextTag = process.env.NEXT_TAG;
 
             let commits = [];
@@ -226,22 +225,80 @@ jobs:
               commits = commitList.data || [];
             }
 
+            const prNumbers = new Set();
+            prNumbers.add(Number(prNumber));
+
+            for (const commit of commits) {
+              const firstLine = commit.commit.message.split("\n")[0];
+              const mergeMatch = firstLine.match(/^Merge pull request #(\d+)/);
+              if (mergeMatch) {
+                prNumbers.add(Number(mergeMatch[1]));
+              }
+              const squashMatch = firstLine.match(/\(#(\d+)\)$/);
+              if (squashMatch) {
+                prNumbers.add(Number(squashMatch[1]));
+              }
+
+              const commitPrs = await github.rest.repos
+                .listPullRequestsAssociatedWithCommit({
+                  owner,
+                  repo,
+                  commit_sha: commit.sha,
+                });
+              for (const item of commitPrs.data) {
+                if (item.merged_at) {
+                  prNumbers.add(item.number);
+                }
+              }
+            }
+
+            const mergedPrs = [];
+            const sortedPrNumbers = Array.from(prNumbers).sort(
+              (a, b) => a - b
+            );
+            for (const number of sortedPrNumbers) {
+              const prResp = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: number,
+              });
+              if (prResp.data.merged_at) {
+                mergedPrs.push(prResp.data);
+              }
+            }
+
+            const nonMergeCommits = commits.filter((commit) => {
+              const firstLine = commit.commit.message.split("\n")[0];
+              return !firstLine.startsWith("Merge pull request #");
+            });
+
             const lines = [];
             lines.push(`# ${nextTag}`);
             lines.push("");
-            lines.push("## Merged Pull Request");
-            lines.push(`- #${prNumber} ${prTitle}`);
+            if (previousTagExists) {
+              lines.push(`Changes since ${previousTag}.`);
+            } else {
+              lines.push("Initial release window.");
+            }
             lines.push("");
-            lines.push("## Commits");
+            lines.push("## Merged Pull Requests");
 
-            for (const commit of commits) {
-              const shaShort = commit.sha.substring(0, 7);
-              const firstLine = commit.commit.message.split("\n")[0];
-              lines.push(`- ${shaShort} ${firstLine}`);
+            if (mergedPrs.length) {
+              for (const pr of mergedPrs) {
+                lines.push(`- #${pr.number} ${pr.title}`);
+              }
+            } else {
+              lines.push("- No merged pull requests resolved for this window.");
             }
 
-            if (commits.length === 0) {
-              lines.push("- No commits found for changelog window.");
+            if (nonMergeCommits.length) {
+              lines.push("");
+              lines.push("## Direct Commits");
+              for (const commit of nonMergeCommits.slice(-20)) {
+                const shaShort = commit.sha.substring(0, 7);
+                const firstLine = commit.commit.message.split("\n")[0];
+                lines.push(`- ${shaShort} ${firstLine}`);
+              }
             }
 
             core.setOutput("body", lines.join("\n"));
