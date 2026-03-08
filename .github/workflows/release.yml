@@ -389,10 +389,14 @@ jobs:
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          REPOSITORY_NAME: ${{ github.event.repository.name }}
         run: |
           set -euo pipefail
-          repo_url="https://maven.pkg.github.com/${{ github.repository }}"
-          deploy_repo="github::default::${repo_url}"
+          owner_lc="${REPOSITORY_OWNER,,}"
+          repo_lc="${REPOSITORY_NAME,,}"
+          repo_url="https://maven.pkg.github.com/${owner_lc}/${repo_lc}"
+          deploy_repo="github::${repo_url}"
           mvn -B -ntp deploy \
             -DskipTests \
             -DaltDeploymentRepository="${deploy_repo}"
