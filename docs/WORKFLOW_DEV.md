@@ -46,19 +46,17 @@ What it does:
 3. Runs `yamllint .github/workflows`.
 4. Runs `act` dry-run smoke checks for key workflows if present:
    - `ci.yml`
-   - `release.yml`
+   - `publish.yml`
 
-## Release and Publish Workflows
+## Publish Workflow
 
-`friction-core` release automation workflow:
+`friction-core` package publishing workflow:
 
-- `.github/workflows/release.yml`
+- `.github/workflows/publish.yml`
   - Trigger: push to `master`
-  - Behavior: resolve merged PR labels, compute semver tag, generate changelog,
-    create GitHub Release, then publish Maven package to GitHub Packages
-  - Jobs and permissions:
-    - `release`: `contents: write`, `pull-requests: read`
-    - `publish`: `contents: read`, `packages: write`
+  - Behavior: build and publish Maven package to GitHub Packages
+  - Authentication: `PACKAGES_TOKEN` repository secret (PAT)
+  - Permissions: `contents: read`, `packages: write`
 
 ## PR Checks and Label Policy
 
@@ -80,14 +78,12 @@ Version labels enforced by `version-label-check`:
   - `version:beta`
   - `version:rc`
 
-The same label constraints are enforced again during `release.yml` execution.
-
 ## Artifact Retention
 
 - CI debug artifacts use explicit short retention:
   - `ci.yml` upload step sets `retention-days: 1`
 - No long-lived workflow artifacts are retained for non-release runs.
-- Long-lived distributables are published as GitHub Releases and GitHub Packages.
+- Long-lived distributables are published to GitHub Packages.
 
 ## Notes
 
@@ -100,13 +96,14 @@ The same label constraints are enforced again during `release.yml` execution.
 
 Symptom:
 
-- GitHub Release is created but a separate publish workflow shows no runs.
+- Publish job fails with `401 Unauthorized` to `maven.pkg.github.com`.
 
 Cause:
 
-- `GITHUB_TOKEN`-created events do not reliably trigger downstream workflows.
+- Missing/invalid `PACKAGES_TOKEN`, or package write access not granted.
 
 Resolution:
 
-- Use unified release + publish jobs in `release.yml` (current model), or use a
-  tag-push trigger strategy if workflows must remain split.
+- Ensure repo secret `PACKAGES_TOKEN` exists and has `write:packages`.
+- For private repos, include `repo` scope as well.
+- Confirm package/repository access settings allow this repo to publish.

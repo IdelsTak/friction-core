@@ -43,7 +43,7 @@ print_step "Running yamllint on workflow files"
 )
 
 print_step "Running act dry-run smoke checks for key workflows"
-KEY_WORKFLOWS=("ci.yml" "release.yml" "publish.yml")
+KEY_WORKFLOWS=("ci.yml" "publish.yml")
 FOUND=0
 
 for wf in "${KEY_WORKFLOWS[@]}"; do

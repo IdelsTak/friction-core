@@ -1,0 +1,76 @@
+---
+name: Publish Package
+
+'on':
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-master
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Require PACKAGES_TOKEN
+        env:
+          PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${PACKAGES_TOKEN:-}" ]]; then
+            echo "Missing required secret: PACKAGES_TOKEN"
+            echo "Create PAT with write:packages (and repo for private repos)."
+            exit 1
+          fi
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: PACKAGES_TOKEN
+          settings-path: ${{ github.workspace }}
+
+      - name: Set publish version
+        run: |
+          set -euo pipefail
+          base_version="$(
+            mvn -q -DforceStdout help:evaluate -Dexpression=project.version
+          )"
+          version="${base_version}-build.${GITHUB_RUN_NUMBER}"
+          echo "Publishing version: ${version}"
+          mvn -B -ntp versions:set \
+            -DnewVersion="${version}" \
+            -DgenerateBackupPoms=false
+
+      - name: Publish Maven package to GitHub Packages
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          REPOSITORY_NAME: ${{ github.event.repository.name }}
+        run: |
+          set -euo pipefail
+          owner_lc="${REPOSITORY_OWNER,,}"
+          repo_lc="${REPOSITORY_NAME,,}"
+          repo_url="https://maven.pkg.github.com/${owner_lc}/${repo_lc}"
+          deploy_repo="github::${repo_url}"
+          mvn -B -ntp deploy \
+            -DskipTests \
+            -DaltDeploymentRepository="${deploy_repo}"
