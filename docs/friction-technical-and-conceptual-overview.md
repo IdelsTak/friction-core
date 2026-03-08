@@ -221,7 +221,7 @@ sequenceDiagram
 ## 8. Open Questions & Assumptions
 
 * **Observation Clustering Logic:** Defined in `OBSERVATION_CLUSTERING.md` and governed by `ADR-0006`.
-* **Descriptor Generation:** How the `Friction.descriptor` string is derived is not specified. Likely from the most common terms or representative phrases in its observations.
+* **Descriptor Generation:** Defined in `DESCRIPTOR_GENERATION.md` and governed by `ADR-0008`.
 * **Merge Strategy:** The behavior of `Friction.mergeWith()` is not fully defined. It must be clarified what triggers a merge—an external process, user action, or automated rule—when two frictions are duplicates.
 * **Metrics Calculation Details:** Defined in `METRICS_SEMANTICS.md` and governed by `ADR-0007`.
 * **Security & Access Control:** Strategies for securing sensitive configuration data (`SourceConfig` may contain API keys) and controlling access to source configuration or friction data are not detailed.
