@@ -10,3 +10,9 @@
 
   ## Docs
   See [docs](docs/) full architecture and design notes.
+
+  ## Published Artifacts
+  GitHub Packages publish includes:
+  - Standard library jar: `friction-core-<version>.jar`
+  - Non-shaded runtime dependencies copied at package time to:
+    - `target/libs/*.jar`
