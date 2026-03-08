@@ -224,7 +224,7 @@ sequenceDiagram
 * **Descriptor Generation:** Defined in `DESCRIPTOR_GENERATION.md` and governed by `ADR-0008`.
 * **Merge Strategy:** Defined in `MERGE_SPLIT_POLICY.md` and governed by `ADR-0009`.
 * **Metrics Calculation Details:** Defined in `METRICS_SEMANTICS.md` and governed by `ADR-0007`.
-* **Security & Access Control:** Strategies for securing sensitive configuration data (`SourceConfig` may contain API keys) and controlling access to source configuration or friction data are not detailed.
+* **Security & Access Control:** Defined in `SECURITY_ACCESS_CONTROL.md` and governed by `ADR-0010`.
 * **Scalability and Performance:** While horizontal scaling is assumed, specific strategies for data partitioning, high-volume ingestion, and efficient clustering are not defined.
 
 ## 9. Recommended Java Project Structure

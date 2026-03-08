@@ -13,3 +13,4 @@ Architecture Decision Records (ADRs) are the primary decision log for shared Fri
 - [ADR-0007 Metrics Semantics and Edge-Case Policy](./ADR-0007-metrics-semantics-and-edge-cases.md)
 - [ADR-0008 Friction Descriptor Generation Policy](./ADR-0008-descriptor-generation-policy.md)
 - [ADR-0009 Friction Merge/Split Execution Policy](./ADR-0009-merge-split-execution-policy.md)
+- [ADR-0010 Security and Access Control Policy](./ADR-0010-security-access-control-policy.md)
