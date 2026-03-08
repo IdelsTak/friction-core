@@ -209,12 +209,45 @@ jobs:
             let commits = [];
 
             if (previousTagExists) {
-              const compare = await github.rest.repos.compareCommits({
-                owner,
-                repo,
-                basehead: `${previousTag}...${sha}`,
-              });
-              commits = compare.data.commits || [];
+              try {
+                const compare = await github.rest.repos.compareCommits({
+                  owner,
+                  repo,
+                  basehead: `${previousTag}...${sha}`,
+                });
+                commits = compare.data.commits || [];
+              } catch (error) {
+                core.warning(
+                  `Compare by tag failed (${previousTag}...${sha}): ` +
+                  `${error.message}`
+                );
+                try {
+                  const tagCommit = await github.rest.repos.getCommit({
+                    owner,
+                    repo,
+                    ref: previousTag,
+                  });
+                  const baseSha = tagCommit.data.sha;
+                  const compareBySha = await github.rest.repos.compareCommits({
+                    owner,
+                    repo,
+                    basehead: `${baseSha}...${sha}`,
+                  });
+                  commits = compareBySha.data.commits || [];
+                } catch (fallbackError) {
+                  core.warning(
+                    "Falling back to listCommits because compare failed: " +
+                    `${fallbackError.message}`
+                  );
+                  const commitList = await github.rest.repos.listCommits({
+                    owner,
+                    repo,
+                    sha,
+                    per_page: 50,
+                  });
+                  commits = commitList.data || [];
+                }
+              }
             } else {
               const commitList = await github.rest.repos.listCommits({
                 owner,
