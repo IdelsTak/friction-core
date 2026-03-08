@@ -222,7 +222,7 @@ sequenceDiagram
 
 * **Observation Clustering Logic:** Defined in `OBSERVATION_CLUSTERING.md` and governed by `ADR-0006`.
 * **Descriptor Generation:** Defined in `DESCRIPTOR_GENERATION.md` and governed by `ADR-0008`.
-* **Merge Strategy:** The behavior of `Friction.mergeWith()` is not fully defined. It must be clarified what triggers a merge—an external process, user action, or automated rule—when two frictions are duplicates.
+* **Merge Strategy:** Defined in `MERGE_SPLIT_POLICY.md` and governed by `ADR-0009`.
 * **Metrics Calculation Details:** Defined in `METRICS_SEMANTICS.md` and governed by `ADR-0007`.
 * **Security & Access Control:** Strategies for securing sensitive configuration data (`SourceConfig` may contain API keys) and controlling access to source configuration or friction data are not detailed.
 * **Scalability and Performance:** While horizontal scaling is assumed, specific strategies for data partitioning, high-volume ingestion, and efficient clustering are not defined.

@@ -10,6 +10,7 @@ This directory is the single source of truth for shared product, domain, and arc
 - [Observation Clustering Strategy](./OBSERVATION_CLUSTERING.md)
 - [Metrics Semantics and Edge-Case Policy](./METRICS_SEMANTICS.md)
 - [Descriptor Generation Policy](./DESCRIPTOR_GENERATION.md)
+- [Merge/Split Execution Policy](./MERGE_SPLIT_POLICY.md)
 - [Repo Boundaries](./REPO_BOUNDARIES.md)
 - [Versioning Policy](./VERSIONING.md)
 - [Decision Records Index](./adr/README.md)
