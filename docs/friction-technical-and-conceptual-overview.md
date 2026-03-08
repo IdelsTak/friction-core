@@ -223,7 +223,7 @@ sequenceDiagram
 * **Observation Clustering Logic:** Defined in `OBSERVATION_CLUSTERING.md` and governed by `ADR-0006`.
 * **Descriptor Generation:** How the `Friction.descriptor` string is derived is not specified. Likely from the most common terms or representative phrases in its observations.
 * **Merge Strategy:** The behavior of `Friction.mergeWith()` is not fully defined. It must be clarified what triggers a merge—an external process, user action, or automated rule—when two frictions are duplicates.
-* **Metrics Calculation Details:** Specific formulas and weighting factors for `intensity`, `trend`, and other metrics are not finalized. The system must also define metrics behavior for a `Friction` with fewer than two observations (e.g., default metrics or null-safe values).
+* **Metrics Calculation Details:** Defined in `METRICS_SEMANTICS.md` and governed by `ADR-0007`.
 * **Security & Access Control:** Strategies for securing sensitive configuration data (`SourceConfig` may contain API keys) and controlling access to source configuration or friction data are not detailed.
 * **Scalability and Performance:** While horizontal scaling is assumed, specific strategies for data partitioning, high-volume ingestion, and efficient clustering are not defined.
 
