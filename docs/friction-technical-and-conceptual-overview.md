@@ -220,7 +220,7 @@ sequenceDiagram
 
 ## 8. Open Questions & Assumptions
 
-* **Observation Clustering Logic:** The algorithm for grouping `Observation`s into a `Friction` aggregate is undefined. Options include keyword matching, NLP-based semantic similarity, or another method. This logic will reside in `FrictionService`.
+* **Observation Clustering Logic:** Defined in `OBSERVATION_CLUSTERING.md` and governed by `ADR-0006`.
 * **Descriptor Generation:** How the `Friction.descriptor` string is derived is not specified. Likely from the most common terms or representative phrases in its observations.
 * **Merge Strategy:** The behavior of `Friction.mergeWith()` is not fully defined. It must be clarified what triggers a merge—an external process, user action, or automated rule—when two frictions are duplicates.
 * **Metrics Calculation Details:** Specific formulas and weighting factors for `intensity`, `trend`, and other metrics are not finalized. The system must also define metrics behavior for a `Friction` with fewer than two observations (e.g., default metrics or null-safe values).
