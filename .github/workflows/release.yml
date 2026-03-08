@@ -35,22 +35,65 @@ jobs:
             const repo = context.repo.repo;
             const sha = context.sha;
 
-            const prResp = await github.rest.repos
+            const baseBranch = context.ref.replace("refs/heads/", "");
+            let pr = null;
+
+            const associated = await github.rest.repos
               .listPullRequestsAssociatedWithCommit({
                 owner,
                 repo,
                 commit_sha: sha,
               });
+            if (associated.data.length) {
+              const merged = associated.data.find((item) => item.merged_at);
+              pr = merged || associated.data[0];
+            }
 
-            if (!prResp.data.length) {
+            if (!pr) {
+              const closedPrs = await github.paginate(
+                github.rest.pulls.list,
+                {
+                  owner,
+                  repo,
+                  state: "closed",
+                  base: baseBranch,
+                  sort: "updated",
+                  direction: "desc",
+                  per_page: 100,
+                }
+              );
+              const bySha = closedPrs.find(
+                (item) => item.merged_at && item.merge_commit_sha === sha
+              );
+              if (bySha) {
+                pr = bySha;
+              }
+            }
+
+            if (!pr) {
+              const headMessage = context.payload.head_commit?.message || "";
+              const prNumberMatch = headMessage.match(/#(\d+)/);
+              if (prNumberMatch) {
+                const prNumber = Number(prNumberMatch[1]);
+                const fetched = await github.rest.pulls.get({
+                  owner,
+                  repo,
+                  pull_number: prNumber,
+                });
+                if (fetched.data.merged_at) {
+                  pr = fetched.data;
+                }
+              }
+            }
+
+            if (!pr) {
               core.setFailed(
-                `No pull request associated with commit ${sha}.`
+                `Unable to resolve merged PR for commit ${sha}. ` +
+                "Release requires PR-based merges with version:* labels."
               );
               return;
             }
 
-            const mergedPr = prResp.data.find((item) => item.merged_at);
-            const pr = mergedPr || prResp.data[0];
             const labels = pr.labels.map((label) => label.name);
 
             const impactLabels = [
