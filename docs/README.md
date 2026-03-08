@@ -12,6 +12,7 @@ This directory is the single source of truth for shared product, domain, and arc
 - [Descriptor Generation Policy](./DESCRIPTOR_GENERATION.md)
 - [Merge/Split Execution Policy](./MERGE_SPLIT_POLICY.md)
 - [Security and Access Control Policy](./SECURITY_ACCESS_CONTROL.md)
+- [Scalability and Partitioning Strategy](./SCALABILITY_PARTITIONING.md)
 - [Repo Boundaries](./REPO_BOUNDARIES.md)
 - [Versioning Policy](./VERSIONING.md)
 - [Decision Records Index](./adr/README.md)
