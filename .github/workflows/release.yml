@@ -1,0 +1,213 @@
+---
+name: Release
+
+'on':
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: release-master
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve PR labels and compute next version
+        id: version
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const sha = context.sha;
+
+            const prResp = await github.rest.repos
+              .listPullRequestsAssociatedWithCommit({
+                owner,
+                repo,
+                commit_sha: sha,
+              });
+
+            if (!prResp.data.length) {
+              core.setFailed(
+                `No pull request associated with commit ${sha}.`
+              );
+              return;
+            }
+
+            const mergedPr = prResp.data.find((item) => item.merged_at);
+            const pr = mergedPr || prResp.data[0];
+            const labels = pr.labels.map((label) => label.name);
+
+            const impactLabels = [
+              "version:major",
+              "version:minor",
+              "version:patch",
+            ];
+            const preLabels = [
+              "version:alpha",
+              "version:beta",
+              "version:rc",
+            ];
+
+            const impact = impactLabels.filter(
+              (label) => labels.includes(label)
+            );
+            const prerelease = preLabels.filter(
+              (label) => labels.includes(label)
+            );
+
+            if (impact.length !== 1) {
+              core.setFailed(
+                "Expected exactly one impact label: " +
+                impactLabels.join(", ")
+              );
+              return;
+            }
+
+            if (prerelease.length > 1) {
+              core.setFailed(
+                "Expected at most one prerelease label: " +
+                preLabels.join(", ")
+              );
+              return;
+            }
+
+            const tagResp = await github.rest.repos.listTags({
+              owner,
+              repo,
+              per_page: 100,
+            });
+
+            const semverTag = /^v(\d+)\.(\d+)\.(\d+)$/;
+            const stableTags = tagResp.data
+              .map((tag) => tag.name)
+              .filter((name) => semverTag.test(name));
+
+            const previousTag = stableTags[0] || "v0.0.0";
+            const previousTagExists = stableTags.length > 0;
+
+            const match = previousTag.match(semverTag);
+            if (!match) {
+              core.setFailed(`Unable to parse previous tag ${previousTag}.`);
+              return;
+            }
+
+            let major = Number(match[1]);
+            let minor = Number(match[2]);
+            let patch = Number(match[3]);
+
+            if (impact[0] === "version:major") {
+              major += 1;
+              minor = 0;
+              patch = 0;
+            } else if (impact[0] === "version:minor") {
+              minor += 1;
+              patch = 0;
+            } else {
+              patch += 1;
+            }
+
+            let nextVersion = `${major}.${minor}.${patch}`;
+            if (prerelease.length === 1) {
+              const stage = prerelease[0].split(":")[1];
+              nextVersion = `${nextVersion}-${stage}.1`;
+            }
+
+            const nextTag = `v${nextVersion}`;
+
+            core.info(`PR #${pr.number} labels: ${labels.join(", ")}`);
+            core.info(`Previous stable tag: ${previousTag}`);
+            core.info(`Next tag: ${nextTag}`);
+
+            core.setOutput("pr_number", String(pr.number));
+            core.setOutput("pr_title", pr.title);
+            core.setOutput("previous_tag", previousTag);
+            core.setOutput("previous_tag_exists", String(previousTagExists));
+            core.setOutput("next_version", nextVersion);
+            core.setOutput("next_tag", nextTag);
+            core.setOutput("prerelease", String(prerelease.length === 1));
+
+      - name: Generate release changelog
+        id: changelog
+        uses: actions/github-script@v7
+        env:
+          PREVIOUS_TAG: ${{ steps.version.outputs.previous_tag }}
+          PREVIOUS_TAG_EXISTS: ${{ steps.version.outputs.previous_tag_exists }}
+          PR_NUMBER: ${{ steps.version.outputs.pr_number }}
+          PR_TITLE: ${{ steps.version.outputs.pr_title }}
+          NEXT_TAG: ${{ steps.version.outputs.next_tag }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const sha = context.sha;
+            const previousTag = process.env.PREVIOUS_TAG;
+            const previousTagExists = (
+              process.env.PREVIOUS_TAG_EXISTS === "true"
+            );
+            const prNumber = process.env.PR_NUMBER;
+            const prTitle = process.env.PR_TITLE;
+            const nextTag = process.env.NEXT_TAG;
+
+            let commits = [];
+
+            if (previousTagExists) {
+              const compare = await github.rest.repos.compareCommits({
+                owner,
+                repo,
+                basehead: `${previousTag}...${sha}`,
+              });
+              commits = compare.data.commits || [];
+            } else {
+              const commitList = await github.rest.repos.listCommits({
+                owner,
+                repo,
+                sha,
+                per_page: 20,
+              });
+              commits = commitList.data || [];
+            }
+
+            const lines = [];
+            lines.push(`# ${nextTag}`);
+            lines.push("");
+            lines.push("## Merged Pull Request");
+            lines.push(`- #${prNumber} ${prTitle}`);
+            lines.push("");
+            lines.push("## Commits");
+
+            for (const commit of commits) {
+              const shaShort = commit.sha.substring(0, 7);
+              const firstLine = commit.commit.message.split("\n")[0];
+              lines.push(`- ${shaShort} ${firstLine}`);
+            }
+
+            if (commits.length === 0) {
+              lines.push("- No commits found for changelog window.");
+            }
+
+            core.setOutput("body", lines.join("\n"));
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.next_tag }}
+          name: ${{ steps.version.outputs.next_tag }}
+          body: ${{ steps.changelog.outputs.body }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ steps.version.outputs.prerelease }}
