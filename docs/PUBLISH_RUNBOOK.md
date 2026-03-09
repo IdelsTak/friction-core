@@ -38,21 +38,9 @@ Complete these once per repo/org setup.
 - Repo: `friction-core` -> `Settings` -> `Actions` -> `General`
 - Set `Workflow permissions` to `Read and write permissions`
 
-2. Create PAT for package publishing
-- Create PAT from the owner account that owns/publishes packages (`IdelsTak`)
-- Required scopes:
-  - `write:packages`
-  - `read:packages`
-  - `repo` (if repo is private)
-
-3. Add repo secret
-- Repo: `friction-core` -> `Settings` -> `Secrets and variables` -> `Actions`
-- Secret name: `PACKAGES_TOKEN`
-- Secret value: PAT from step 2
-
-4. Verify package/repo access policy (if org restrictions apply)
+2. Verify package/repo access policy (if org restrictions apply)
 - Confirm this repo is allowed to publish packages
-- Confirm package visibility/settings do not block writes from this repo token owner
+- Confirm package visibility/settings do not block writes from this repo
 
 ## Maven Requirements (Must Stay True)
 
@@ -80,8 +68,8 @@ Why this matters:
 In `publish.yml`, the setup-java step must have:
 - `server-id: github`
 - `server-username: GITHUB_ACTOR`
-- `server-password: PACKAGES_TOKEN`
-- `env.PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}`
+- `server-password: GITHUB_TOKEN`
+- `env.GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}`
 
 If this env wiring is missing, Maven will deploy with invalid/missing auth and return `401`.
 
@@ -139,12 +127,11 @@ Checks:
 `401 Unauthorized` on `mvn deploy`
 
 Checks in order:
-1. `PACKAGES_TOKEN` secret exists in repo
-2. PAT scopes are correct (`write:packages`, `read:packages`, and `repo` if private)
-3. PAT owner has rights on target package/repo
-4. `setup-java` receives `PACKAGES_TOKEN` env
-5. `pom.xml` has correct `distributionManagement` with id `github`
-6. `distributionManagement` URL points to exact repo path
+1. Workflow/job permissions include `packages: write`
+2. Repository Actions permissions are set to read/write
+3. `setup-java` receives `GITHUB_TOKEN` env and `server-password: GITHUB_TOKEN`
+4. `pom.xml` has correct `distributionManagement` with id `github`
+5. `distributionManagement` URL points to exact repo path
 
 ### Symptom C
 `pom.xml version (...) does not match tag (...)`
@@ -162,7 +149,8 @@ Fix:
 - Do not remove `distributionManagement` from `pom.xml`.
 - Do not change setup-java `server-id` unless `pom.xml` repository id changes too.
 - Do not move publish trigger back to `on: release` without redesign; use `workflow_run` to keep deterministic chaining.
-- Do not publish with a PAT from an unrelated account lacking package permissions.
+- PATs are for external consumers pulling private packages, not for
+  `friction-core` publishing itself.
 
 ## Change Checklist (When Editing Workflows)
 
