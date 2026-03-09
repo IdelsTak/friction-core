@@ -1,0 +1,283 @@
+---
+name: Release
+
+'on':
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: release-master
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: release
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version bump from PR labels
+        id: version
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const sha = context.sha;
+            let pr = null;
+
+            const associated = await github.rest.repos
+              .listPullRequestsAssociatedWithCommit({
+                owner,
+                repo,
+                commit_sha: sha,
+              });
+            if (associated.data.length) {
+              const mergedPr = associated.data.find((item) => item.merged_at);
+              pr = mergedPr || associated.data[0];
+            }
+
+            if (!pr) {
+              const headMessage = context.payload.head_commit?.message || "";
+              const match = headMessage.match(/#(\d+)/);
+              if (match) {
+                const fetched = await github.rest.pulls.get({
+                  owner,
+                  repo,
+                  pull_number: Number(match[1]),
+                });
+                if (fetched.data.merged_at) {
+                  pr = fetched.data;
+                }
+              }
+            }
+
+            if (!pr) {
+              core.setFailed(`Unable to resolve merged PR for commit ${sha}.`);
+              return;
+            }
+
+            const labels = pr.labels.map((label) => label.name);
+            const impactLabels = [
+              "version:major",
+              "version:minor",
+              "version:patch",
+            ];
+            const prereleaseLabels = [
+              "version:alpha",
+              "version:beta",
+              "version:rc",
+            ];
+
+            const impact = impactLabels.filter(
+              (label) => labels.includes(label)
+            );
+            const prerelease = prereleaseLabels.filter(
+              (label) => labels.includes(label)
+            );
+
+            if (impact.length !== 1) {
+              core.setFailed(
+                "Expected exactly one impact label: " + impactLabels.join(", ")
+              );
+              return;
+            }
+            if (prerelease.length > 1) {
+              core.setFailed(
+                "Expected at most one prerelease label: " +
+                prereleaseLabels.join(", ")
+              );
+              return;
+            }
+
+            const tagResp = await github.rest.repos.listTags({
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const semverTag = /^v(\d+)\.(\d+)\.(\d+)$/;
+            const stableTags = tagResp.data
+              .map((tag) => tag.name)
+              .filter((name) => semverTag.test(name));
+
+            const previousTag = stableTags[0] || "v0.0.0";
+            const previousTagExists = stableTags.length > 0;
+            const matchVersion = previousTag.match(semverTag);
+
+            let major = Number(matchVersion?.[1] || 0);
+            let minor = Number(matchVersion?.[2] || 0);
+            let patch = Number(matchVersion?.[3] || 0);
+
+            if (impact[0] === "version:major") {
+              major += 1;
+              minor = 0;
+              patch = 0;
+            } else if (impact[0] === "version:minor") {
+              minor += 1;
+              patch = 0;
+            } else {
+              patch += 1;
+            }
+
+            let nextVersion = `${major}.${minor}.${patch}`;
+            if (prerelease.length === 1) {
+              const stage = prerelease[0].split(":")[1];
+              nextVersion = `${nextVersion}-${stage}.1`;
+            }
+
+            const nextTag = `v${nextVersion}`;
+            core.info(`PR #${pr.number} labels: ${labels.join(", ")}`);
+            core.info(`Previous tag: ${previousTag}`);
+            core.info(`Next version: ${nextVersion}`);
+
+            core.setOutput("pr_number", String(pr.number));
+            core.setOutput("pr_title", pr.title);
+            core.setOutput("previous_tag", previousTag);
+            core.setOutput("previous_tag_exists", String(previousTagExists));
+            core.setOutput("next_version", nextVersion);
+            core.setOutput("next_tag", nextTag);
+            core.setOutput("prerelease", String(prerelease.length === 1));
+
+      - name: Set release version in pom.xml
+        run: |
+          set -euo pipefail
+          mvn -B -ntp versions:set \
+            -DnewVersion="${{ steps.version.outputs.next_version }}" \
+            -DgenerateBackupPoms=false
+
+      - name: Commit version bump
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pom.xml
+          next_version="${{ steps.version.outputs.next_version }}"
+          commit_msg="chore: bump version to ${next_version}"
+          git commit -m "${commit_msg}" || {
+            echo "No version change to commit"
+            exit 0
+          }
+          git push origin HEAD:master
+
+      - name: Create and push tag
+        run: |
+          set -euo pipefail
+          tag="${{ steps.version.outputs.next_tag }}"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag $tag already exists; skipping"
+            exit 0
+          fi
+          git tag "$tag"
+          git push origin "$tag"
+
+      - name: Generate changelog
+        id: changelog
+        uses: actions/github-script@v7
+        env:
+          PREVIOUS_TAG: ${{ steps.version.outputs.previous_tag }}
+          PREVIOUS_TAG_EXISTS: ${{ steps.version.outputs.previous_tag_exists }}
+          PR_NUMBER: ${{ steps.version.outputs.pr_number }}
+          NEXT_TAG: ${{ steps.version.outputs.next_tag }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const sha = context.sha;
+            const previousTag = process.env.PREVIOUS_TAG;
+            const previousTagExists = (
+              process.env.PREVIOUS_TAG_EXISTS === "true"
+            );
+            const prNumber = process.env.PR_NUMBER;
+            const nextTag = process.env.NEXT_TAG;
+
+            let commits = [];
+            if (previousTagExists) {
+              try {
+                const compare = await github.rest.repos.compareCommits({
+                  owner,
+                  repo,
+                  basehead: `${previousTag}...${sha}`,
+                });
+                commits = compare.data.commits || [];
+              } catch (error) {
+                core.warning(`Compare failed: ${error.message}`);
+                const commitList = await github.rest.repos.listCommits({
+                  owner,
+                  repo,
+                  sha,
+                  per_page: 50,
+                });
+                commits = commitList.data || [];
+              }
+            } else {
+              const commitList = await github.rest.repos.listCommits({
+                owner,
+                repo,
+                sha,
+                per_page: 20,
+              });
+              commits = commitList.data || [];
+            }
+
+            const prNumbers = new Set([Number(prNumber)]);
+            for (const commit of commits) {
+              const firstLine = commit.commit.message.split("\n")[0];
+              const mergeMatch = firstLine.match(/^Merge pull request #(\d+)/);
+              if (mergeMatch) {
+                prNumbers.add(Number(mergeMatch[1]));
+              }
+            }
+
+            const mergedPrs = [];
+            for (const number of Array.from(prNumbers).sort((a, b) => a - b)) {
+              const prResp = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: number,
+              });
+              if (prResp.data.merged_at) {
+                mergedPrs.push(prResp.data);
+              }
+            }
+
+            const lines = [];
+            lines.push(`# ${nextTag}`);
+            lines.push("");
+            if (previousTagExists) {
+              lines.push(`Changes since ${previousTag}.`);
+            } else {
+              lines.push("Initial release window.");
+            }
+            lines.push("");
+            lines.push("## Merged Pull Requests");
+
+            if (mergedPrs.length) {
+              for (const pr of mergedPrs) {
+                lines.push(`- #${pr.number} ${pr.title}`);
+              }
+            } else {
+              lines.push("- No merged pull requests resolved for this window.");
+            }
+
+            core.setOutput("body", lines.join("\n"));
+
+      - name: Create GitHub Release notes
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.next_tag }}
+          name: ${{ steps.version.outputs.next_tag }}
+          body: ${{ steps.changelog.outputs.body }}
+          target_commitish: master
+          prerelease: ${{ steps.version.outputs.prerelease }}

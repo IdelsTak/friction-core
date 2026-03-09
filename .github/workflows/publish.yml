@@ -2,10 +2,11 @@
 name: Publish Package
 
 'on':
-  push:
-    branches:
-      - master
-  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Release
+    types:
+      - completed
 
 permissions:
   contents: read
@@ -18,12 +19,16 @@ concurrency:
 jobs:
   publish:
     name: publish
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
-      - name: Checkout
+      - name: Checkout master
         uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
 
       - name: Require PACKAGES_TOKEN
         env:
@@ -36,7 +41,42 @@ jobs:
             exit 1
           fi
 
+      - name: Resolve latest release tag
+        id: tag
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          latest_tag="$(
+            git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1
+          )"
+          if [[ -z "${latest_tag}" ]]; then
+            echo "No stable semver tag found (expected vX.Y.Z)."
+            exit 1
+          fi
+          echo "tag=${latest_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout latest tag
+        run: |
+          set -euo pipefail
+          git checkout "${{ steps.tag.outputs.tag }}"
+
+      - name: Validate pom.xml matches tag
+        run: |
+          set -euo pipefail
+          tag="${{ steps.tag.outputs.tag }}"
+          tag_version="${tag#v}"
+          pom_version="$(
+            mvn -q -DforceStdout help:evaluate -Dexpression=project.version
+          )"
+          if [[ "${pom_version}" != "${tag_version}" ]]; then
+            echo "pom.xml version (${pom_version})"
+            echo "does not match tag (${tag_version})"
+            exit 1
+          fi
+
       - name: Set up JDK
+        env:
+          PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -47,22 +87,8 @@ jobs:
           server-password: PACKAGES_TOKEN
           settings-path: ${{ github.workspace }}
 
-      - name: Set publish version
-        run: |
-          set -euo pipefail
-          base_version="$(
-            mvn -q -DforceStdout help:evaluate -Dexpression=project.version
-          )"
-          version="${base_version}-build.${GITHUB_RUN_NUMBER}"
-          echo "Publishing version: ${version}"
-          mvn -B -ntp versions:set \
-            -DnewVersion="${version}" \
-            -DgenerateBackupPoms=false
-
       - name: Publish Maven package to GitHub Packages
         env:
-          GITHUB_ACTOR: ${{ github.actor }}
-          PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
           REPOSITORY_NAME: ${{ github.event.repository.name }}
         run: |
