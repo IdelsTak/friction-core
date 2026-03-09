@@ -76,6 +76,7 @@ jobs:
 
       - name: Set up JDK
         env:
+          GITHUB_ACTOR: ${{ github.actor }}
           PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
         uses: actions/setup-java@v4
         with:
@@ -89,14 +90,8 @@ jobs:
 
       - name: Publish Maven package to GitHub Packages
         env:
-          REPOSITORY_OWNER: ${{ github.repository_owner }}
-          REPOSITORY_NAME: ${{ github.event.repository.name }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
         run: |
           set -euo pipefail
-          owner_lc="${REPOSITORY_OWNER,,}"
-          repo_lc="${REPOSITORY_NAME,,}"
-          repo_url="https://maven.pkg.github.com/${owner_lc}/${repo_lc}"
-          deploy_repo="github::${repo_url}"
-          mvn -B -ntp deploy \
-            -DskipTests \
-            -DaltDeploymentRepository="${deploy_repo}"
+          mvn -B -ntp deploy -DskipTests
