@@ -44,9 +44,8 @@
 
 ## Publishing
 
-- `publish.yml` runs on successful `workflow_run` completion of `Release`.
-- It checks out latest semver tag and verifies:
-  - `pom.xml` version == tag version
-- Publishes Maven package to GitHub Packages using `GITHUB_TOKEN`.
-- Deploy target is defined in `pom.xml` via `<distributionManagement>` with
-  repository id `github`.
+Publish implementation details are defined only in
+`docs/PUBLISH_RUNBOOK.md`.
+
+Rule:
+- Keep `.github/workflows/publish.yml` aligned to the runbook template exactly.

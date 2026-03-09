@@ -12,8 +12,10 @@ Define an agreed CI/CD model for `friction-core`, `friction-adapters`, and `fric
 
 ## Operational Runbooks
 
-- `PUBLISH_RUNBOOK.md` - exact setup and troubleshooting steps for
-  `friction-core` release/publish pipeline and GitHub Packages auth.
+- `docs/PUBLISH_RUNBOOK.md` - authoritative publish template and invariants for
+  `friction-core`.
+- Guardrail: keep `.github/workflows/publish.yml` aligned to this runbook;
+  avoid variant implementations.
 
 ## Agreed Objectives
 
@@ -63,7 +65,7 @@ Source of truth for released versions:
 
 - Build/package with Maven
 - Publish artifact to GitHub Packages (Maven registry)
-- Publish only on release workflow success
+- Publish implementation is defined only by `docs/PUBLISH_RUNBOOK.md`
 
 ## `friction-adapters`
 

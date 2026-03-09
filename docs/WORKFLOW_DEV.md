@@ -49,6 +49,11 @@ What it does:
    - `release.yml`
    - `publish.yml`
 
+## Publish Reference
+
+`docs/PUBLISH_RUNBOOK.md` is the only source of truth for publish behavior.
+Use its template directly and avoid local variations.
+
 ## Workflow Partitioning
 
 `friction-core` CI/CD uses three workflows:
@@ -61,15 +66,15 @@ What it does:
   - Behavior: resolve semantic bump from PR labels, update `pom.xml`, commit version bump, create tag, generate changelog notes
 - `.github/workflows/publish.yml`
   - Trigger: `workflow_run` for `Release` completion
-  - Behavior: checkout latest tag, verify `pom.xml` version matches tag, publish Maven package via `distributionManagement`
+  - Behavior: defined only by `docs/PUBLISH_RUNBOOK.md` template
 
 ## Authentication and Permissions
 
-- `release.yml` uses `GITHUB_TOKEN` for commit/tag/release-note operations.
-- `publish.yml` uses `GITHUB_TOKEN` for Maven package deployment.
-- `setup-java` writes `settings.xml` credentials for server id `github`:
-  - username source: `GITHUB_ACTOR`
-  - password source: `GITHUB_TOKEN`
+- `release.yml` must use `GITHUB_TOKEN` for commit/tag/release-note operations.
+- `publish.yml` auth and credential wiring must match
+  `docs/PUBLISH_RUNBOOK.md` exactly.
+- Do not introduce PAT-based auth into `friction-core` publish workflow.
+- Do not infer auth setup from other docs; copy the runbook template as-is.
 
 ## PR Checks and Label Policy
 
@@ -98,19 +103,7 @@ Version labels enforced by `version-label-check`:
 - No long-lived workflow artifacts are retained for non-release runs.
 - Long-lived distributables are published to GitHub Packages.
 
-## Troubleshooting
+## Publish Guardrail
 
-Symptom:
-
-- Publish job fails with `401 Unauthorized` to `maven.pkg.github.com`.
-
-Cause:
-
-- Repo token lacks package write access, or package/repo permissions deny write.
-
-Resolution:
-
-- Ensure workflow/job permissions include `packages: write`.
-- Ensure repository Actions permissions are set to read/write.
-- Confirm package/repository access settings allow this repo to publish.
-- Ensure `publish.yml` runs after successful `Release` workflow completion.
+If publish behavior needs changes, update `docs/PUBLISH_RUNBOOK.md` first, then
+apply the exact template/content to `.github/workflows/publish.yml`.
