@@ -66,14 +66,10 @@ What it does:
 ## Authentication and Permissions
 
 - `release.yml` uses `GITHUB_TOKEN` for commit/tag/release-note operations.
-- `publish.yml` uses `PACKAGES_TOKEN` (PAT) for Maven package deployment.
+- `publish.yml` uses `GITHUB_TOKEN` for Maven package deployment.
 - `setup-java` writes `settings.xml` credentials for server id `github`:
   - username source: `GITHUB_ACTOR`
-  - password source: `PACKAGES_TOKEN`
-- Recommended `PACKAGES_TOKEN` scopes:
-  - `write:packages`
-  - `read:packages`
-  - `repo` (private repos)
+  - password source: `GITHUB_TOKEN`
 
 ## PR Checks and Label Policy
 
@@ -110,10 +106,11 @@ Symptom:
 
 Cause:
 
-- Missing/invalid `PACKAGES_TOKEN`, or package write access not granted.
+- Repo token lacks package write access, or package/repo permissions deny write.
 
 Resolution:
 
-- Ensure repo secret `PACKAGES_TOKEN` exists and has required scopes.
+- Ensure workflow/job permissions include `packages: write`.
+- Ensure repository Actions permissions are set to read/write.
 - Confirm package/repository access settings allow this repo to publish.
 - Ensure `publish.yml` runs after successful `Release` workflow completion.

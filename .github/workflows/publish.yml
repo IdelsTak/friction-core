@@ -30,17 +30,6 @@ jobs:
           ref: master
           fetch-depth: 0
 
-      - name: Require PACKAGES_TOKEN
-        env:
-          PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
-        run: |
-          set -euo pipefail
-          if [[ -z "${PACKAGES_TOKEN:-}" ]]; then
-            echo "Missing required secret: PACKAGES_TOKEN"
-            echo "Create PAT with write:packages (and repo for private repos)."
-            exit 1
-          fi
-
       - name: Resolve latest release tag
         id: tag
         run: |
@@ -77,7 +66,7 @@ jobs:
       - name: Set up JDK
         env:
           GITHUB_ACTOR: ${{ github.actor }}
-          PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -85,13 +74,13 @@ jobs:
           cache: maven
           server-id: github
           server-username: GITHUB_ACTOR
-          server-password: PACKAGES_TOKEN
+          server-password: GITHUB_TOKEN
           settings-path: ${{ github.workspace }}
 
       - name: Publish Maven package to GitHub Packages
         env:
           GITHUB_ACTOR: ${{ github.actor }}
-          PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           mvn -B -ntp deploy -DskipTests
