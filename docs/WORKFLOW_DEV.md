@@ -63,7 +63,7 @@ Use its template directly and avoid local variations.
   - Behavior: build/test validation + label policy checks
 - `.github/workflows/release.yml`
   - Trigger: push to `master`
-  - Behavior: resolve semantic bump from PR labels, update `pom.xml`, commit version bump, create tag, generate changelog notes
+  - Behavior: resolve semantic bump from PR labels, update `pom.xml`, commit version bump, create tag, generate release notes from current PR body
 - `.github/workflows/publish.yml`
   - Trigger: `workflow_run` for `Release` completion
   - Behavior: defined only by `docs/PUBLISH_RUNBOOK.md` template
