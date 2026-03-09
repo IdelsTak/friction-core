@@ -1,169 +1,110 @@
-# friction-core Publish Runbook (Do This Once, Reuse Forever)
+# Publish Runbook
 
-This runbook captures the exact CI/CD setup for publishing `friction-core` to GitHub Packages, including the common failure modes we hit and how to fix them quickly.
+Use the working publish workflow template below exactly as written.
+Do not redesign or partially rewrite it unless you are intentionally replacing
+this release/publish model.
 
-## Current Workflow Model
+## Rule
 
-`friction-core` uses 3 workflows:
+- Source of truth: `docs/PUBLISH_RUNBOOK.md` template below.
+- Target file: `.github/workflows/publish.yml`.
+- Action: copy the template directly.
 
-1. `ci.yml`
-- Trigger: `pull_request`
-- Purpose: build/test + version-label validation
+## Required Invariants
 
-2. `release.yml`
-- Trigger: push to `master`
-- Purpose: compute semver bump from PR labels, update `pom.xml`, commit bump, tag version, generate changelog notes
+- `pom.xml` keeps:
+  - `distributionManagement.repository.id` = `github`
+  - publish URL = `https://maven.pkg.github.com/IdelsTak/friction-core`
+- Workflow keeps:
+  - `on.workflow_run.workflows: [Release]`
+  - `permissions.packages: write`
+  - tag checkout + tag/pom version validation before `mvn deploy`
+  - deploy step with `GITHUB_TOKEN` env
 
-3. `publish.yml`
-- Trigger: `workflow_run` on successful `Release`
-- Purpose: checkout latest semver tag and publish package to GitHub Packages
+## Working `publish.yml` Template
 
-## Source of Truth Files
+```yaml
+---
+name: Publish Package
 
-- Workflow files:
-  - `.github/workflows/ci.yml`
-  - `.github/workflows/release.yml`
-  - `.github/workflows/publish.yml`
-- Maven publish target:
-  - `pom.xml` (`distributionManagement`)
-- Workflow docs:
-  - `docs/WORKFLOW_DEV.md`
-  - `docs/VERSIONING.md`
+'on':
+  workflow_run:
+    workflows:
+      - Release
+    types:
+      - completed
 
-## One-Time GitHub Setup Checklist
+permissions:
+  contents: read
+  packages: write
 
-Complete these once per repo/org setup.
+concurrency:
+  group: publish-master
+  cancel-in-progress: false
 
-1. Repository Actions permissions
-- Repo: `friction-core` -> `Settings` -> `Actions` -> `General`
-- Set `Workflow permissions` to `Read and write permissions`
+jobs:
+  publish:
+    name: publish
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
 
-2. Verify package/repo access policy (if org restrictions apply)
-- Confirm this repo is allowed to publish packages
-- Confirm package visibility/settings do not block writes from this repo
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
 
-## Maven Requirements (Must Stay True)
+      - name: Resolve latest release tag
+        id: tag
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          latest_tag="$(
+            git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1
+          )"
+          if [[ -z "${latest_tag}" ]]; then
+            echo "No stable semver tag found (expected vX.Y.Z)."
+            exit 1
+          fi
+          echo "tag=${latest_tag}" >> "$GITHUB_OUTPUT"
 
-`pom.xml` must include `distributionManagement` with repository id `github`.
+      - name: Checkout latest tag
+        run: |
+          set -euo pipefail
+          git checkout "${{ steps.tag.outputs.tag }}"
 
-Expected section:
+      - name: Install xmlstarlet
+        run: sudo apt-get update && sudo apt-get install -y xmlstarlet
 
-```xml
-<distributionManagement>
-  <repository>
-    <id>github</id>
-    <name>GitHub Packages</name>
-    <url>https://maven.pkg.github.com/IdelsTak/friction-core</url>
-  </repository>
-</distributionManagement>
+      - name: Validate pom.xml matches tag
+        run: |
+          set -euo pipefail
+          tag="${{ steps.tag.outputs.tag }}"
+          tag_version="${tag#v}"
+          pom_version="$(
+            xmlstarlet sel -t \
+              -v "/*[local-name()='project']/*[local-name()='version']" \
+              pom.xml
+          )"
+          if [[ "${pom_version}" != "${tag_version}" ]]; then
+            echo "pom.xml version (${pom_version})"
+            echo "does not match tag (${tag_version})"
+            exit 1
+          fi
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
+
+      - name: Publish
+        run: mvn -B -DskipTests deploy
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
-
-Why this matters:
-- `publish.yml` runs `mvn deploy` (no alternate deployment override).
-- `actions/setup-java` writes Maven credentials for server id `github`.
-- Deploy succeeds only if `distributionManagement.repository.id` matches setup-java `server-id`.
-
-## Workflow Auth Contract
-
-In `publish.yml`, the setup-java step must have:
-- `server-id: github`
-- `server-username: GITHUB_ACTOR`
-- `server-password: GITHUB_TOKEN`
-- `env.GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}`
-
-If this env wiring is missing, Maven will deploy with invalid/missing auth and return `401`.
-
-## Expected Happy Path
-
-1. Merge PR to `master` with exactly one impact label:
-- `version:major` or `version:minor` or `version:patch`
-
-2. `release.yml` runs:
-- resolves PR labels
-- computes next version
-- updates `pom.xml`
-- commits bump
-- creates `vX.Y.Z` tag
-- creates changelog notes
-
-3. `publish.yml` runs (`workflow_run` on Release success):
-- checks out `master`
-- resolves latest semver tag
-- checks out that tag
-- verifies `pom.xml` version equals tag version
-- runs `mvn deploy`
-
-4. Package appears in GitHub Packages.
-
-## Fast Verification Commands
-
-From repo root:
-
-```bash
-actionlint
-yamllint .github/workflows
-```
-
-Quick local Maven check (no publish):
-
-```bash
-mvn -B -ntp -DskipTests verify
-```
-
-## Troubleshooting Matrix
-
-### Symptom A
-`publish.yml` does not run
-
-Checks:
-1. Did `release.yml` run and succeed?
-2. Is `publish.yml` trigger exactly:
-- `on.workflow_run.workflows: ["Release"]`
-- `types: [completed]`
-3. Is publish job gated correctly?
-- `if: github.event.workflow_run.conclusion == 'success'`
-
-### Symptom B
-`401 Unauthorized` on `mvn deploy`
-
-Checks in order:
-1. Workflow/job permissions include `packages: write`
-2. Repository Actions permissions are set to read/write
-3. `setup-java` receives `GITHUB_TOKEN` env and `server-password: GITHUB_TOKEN`
-4. `pom.xml` has correct `distributionManagement` with id `github`
-5. `distributionManagement` URL points to exact repo path
-
-### Symptom C
-`pom.xml version (...) does not match tag (...)`
-
-Cause:
-- Release bump/tag and publish trigger got out of sync
-
-Fix:
-1. Verify latest tag points to commit that contains bumped `pom.xml`
-2. Re-run `Release` then `Publish Package`
-3. If needed, correct tag/version alignment in `master`
-
-## Guardrails (Do Not Change Casually)
-
-- Do not remove `distributionManagement` from `pom.xml`.
-- Do not change setup-java `server-id` unless `pom.xml` repository id changes too.
-- Do not move publish trigger back to `on: release` without redesign; use `workflow_run` to keep deterministic chaining.
-- PATs are for external consumers pulling private packages, not for
-  `friction-core` publishing itself.
-
-## Change Checklist (When Editing Workflows)
-
-After every workflow edit:
-
-1. Run:
-```bash
-actionlint
-yamllint .github/workflows
-```
-
-2. Confirm docs match behavior:
-- `docs/WORKFLOW_DEV.md`
-- `docs/VERSIONING.md`
-
-3. Keep this runbook updated with any new failure modes.
