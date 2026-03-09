@@ -46,17 +46,31 @@ What it does:
 3. Runs `yamllint .github/workflows`.
 4. Runs `act` dry-run smoke checks for key workflows if present:
    - `ci.yml`
+   - `release.yml`
    - `publish.yml`
 
-## Publish Workflow
+## Workflow Partitioning
 
-`friction-core` package publishing workflow:
+`friction-core` CI/CD uses three workflows:
 
-- `.github/workflows/publish.yml`
+- `.github/workflows/ci.yml`
+  - Trigger: pull requests
+  - Behavior: build/test validation + label policy checks
+- `.github/workflows/release.yml`
   - Trigger: push to `master`
-  - Behavior: build and publish Maven package to GitHub Packages
-  - Authentication: `PACKAGES_TOKEN` repository secret (PAT)
-  - Permissions: `contents: read`, `packages: write`
+  - Behavior: resolve semantic bump from PR labels, update `pom.xml`, commit version bump, create tag, generate changelog notes
+- `.github/workflows/publish.yml`
+  - Trigger: `workflow_run` for `Release` completion
+  - Behavior: checkout latest tag, verify `pom.xml` version matches tag, publish Maven package
+
+## Authentication and Permissions
+
+- `release.yml` uses `GITHUB_TOKEN` for commit/tag/release-note operations.
+- `publish.yml` uses `PACKAGES_TOKEN` (PAT) for Maven package deployment.
+- Recommended `PACKAGES_TOKEN` scopes:
+  - `write:packages`
+  - `read:packages`
+  - `repo` (private repos)
 
 ## PR Checks and Label Policy
 
@@ -85,13 +99,6 @@ Version labels enforced by `version-label-check`:
 - No long-lived workflow artifacts are retained for non-release runs.
 - Long-lived distributables are published to GitHub Packages.
 
-## Notes
-
-- The script is non-destructive and fast-fails on first error.
-- If `.github/workflows` does not exist yet, the script exits successfully with a skip message.
-- `act` dry-run validates workflow wiring without full execution.
-- Before merge, still run a real GitHub-hosted workflow execution for runner parity.
-
 ## Troubleshooting
 
 Symptom:
@@ -104,6 +111,6 @@ Cause:
 
 Resolution:
 
-- Ensure repo secret `PACKAGES_TOKEN` exists and has `write:packages`.
-- For private repos, include `repo` scope as well.
+- Ensure repo secret `PACKAGES_TOKEN` exists and has required scopes.
 - Confirm package/repository access settings allow this repo to publish.
+- Ensure `publish.yml` runs after successful `Release` workflow completion.
