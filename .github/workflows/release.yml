@@ -186,89 +186,38 @@ jobs:
         id: changelog
         uses: actions/github-script@v7
         env:
-          PREVIOUS_TAG: ${{ steps.version.outputs.previous_tag }}
-          PREVIOUS_TAG_EXISTS: ${{ steps.version.outputs.previous_tag_exists }}
           PR_NUMBER: ${{ steps.version.outputs.pr_number }}
           NEXT_TAG: ${{ steps.version.outputs.next_tag }}
         with:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const sha = context.sha;
-            const previousTag = process.env.PREVIOUS_TAG;
-            const previousTagExists = (
-              process.env.PREVIOUS_TAG_EXISTS === "true"
-            );
             const prNumber = process.env.PR_NUMBER;
             const nextTag = process.env.NEXT_TAG;
+            const prResp = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: Number(prNumber),
+            });
+            const pr = prResp.data;
 
-            let commits = [];
-            if (previousTagExists) {
-              try {
-                const compare = await github.rest.repos.compareCommits({
-                  owner,
-                  repo,
-                  basehead: `${previousTag}...${sha}`,
-                });
-                commits = compare.data.commits || [];
-              } catch (error) {
-                core.warning(`Compare failed: ${error.message}`);
-                const commitList = await github.rest.repos.listCommits({
-                  owner,
-                  repo,
-                  sha,
-                  per_page: 50,
-                });
-                commits = commitList.data || [];
-              }
-            } else {
-              const commitList = await github.rest.repos.listCommits({
-                owner,
-                repo,
-                sha,
-                per_page: 20,
-              });
-              commits = commitList.data || [];
-            }
-
-            const prNumbers = new Set([Number(prNumber)]);
-            for (const commit of commits) {
-              const firstLine = commit.commit.message.split("\n")[0];
-              const mergeMatch = firstLine.match(/^Merge pull request #(\d+)/);
-              if (mergeMatch) {
-                prNumbers.add(Number(mergeMatch[1]));
-              }
-            }
-
-            const mergedPrs = [];
-            for (const number of Array.from(prNumbers).sort((a, b) => a - b)) {
-              const prResp = await github.rest.pulls.get({
-                owner,
-                repo,
-                pull_number: number,
-              });
-              if (prResp.data.merged_at) {
-                mergedPrs.push(prResp.data);
-              }
-            }
+            const cleanedBody = (pr.body || "")
+              .replace(/<!--[\s\S]*?-->/g, "")
+              .trim();
 
             const lines = [];
             lines.push(`# ${nextTag}`);
             lines.push("");
-            if (previousTagExists) {
-              lines.push(`Changes since ${previousTag}.`);
-            } else {
-              lines.push("Initial release window.");
-            }
+            lines.push(`## Change Summary`);
             lines.push("");
-            lines.push("## Merged Pull Requests");
-
-            if (mergedPrs.length) {
-              for (const pr of mergedPrs) {
-                lines.push(`- #${pr.number} ${pr.title}`);
-              }
+            lines.push(`- PR: #${pr.number} ${pr.title}`);
+            lines.push("");
+            lines.push("## Details");
+            lines.push("");
+            if (cleanedBody.length) {
+              lines.push(cleanedBody);
             } else {
-              lines.push("- No merged pull requests resolved for this window.");
+              lines.push("- No PR body content provided.");
             }
 
             core.setOutput("body", lines.join("\n"));

@@ -119,15 +119,15 @@ Objective: generate release changelogs automatically from commit messages and me
 
 Baseline approach:
 
-- Generate changelog during release workflow from commits since previous tag.
-- Group entries by semantic label and/or Conventional Commit type where available.
-- Include links to PRs/issues and commit SHAs for traceability.
+- Generate changelog during release workflow from the current merged PR only.
+- Use PR title for summary and PR body for detailed release notes content.
+- Keep notes tightly scoped to the release-triggering PR.
 
 Recommended inputs:
 
-- Commit messages (prefer Conventional Commit style for cleaner grouping).
-- PR titles and labels (`version:*`, `architecture`, `mvu`, etc.).
-- Merge metadata between `last_tag..new_tag`.
+- PR title
+- PR body text (with cleanup of template comments)
+- PR labels (`version:*`, `architecture`, `mvu`, etc.) for release policy context
 
 Output targets:
 
@@ -136,8 +136,8 @@ Output targets:
 
 Operational guardrails:
 
-- If commit messages are inconsistent, fall back to PR-title-first changelog entries.
-- Keep changelog generation deterministic and tied to tag boundaries.
+- Avoid commit-range aggregation in release notes for `friction-core`.
+- Keep changelog generation deterministic and tied to the resolved merged PR.
 - Do not require manual edits for normal releases; allow override for exceptional releases.
 
 ## Security and Governance Controls
