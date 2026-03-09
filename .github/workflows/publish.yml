@@ -49,13 +49,18 @@ jobs:
           set -euo pipefail
           git checkout "${{ steps.tag.outputs.tag }}"
 
+      - name: Install xmlstarlet
+        run: sudo apt-get update && sudo apt-get install -y xmlstarlet
+
       - name: Validate pom.xml matches tag
         run: |
           set -euo pipefail
           tag="${{ steps.tag.outputs.tag }}"
           tag_version="${tag#v}"
           pom_version="$(
-            mvn -q -DforceStdout help:evaluate -Dexpression=project.version
+            xmlstarlet sel -t \
+              -v "/*[local-name()='project']/*[local-name()='version']" \
+              pom.xml
           )"
           if [[ "${pom_version}" != "${tag_version}" ]]; then
             echo "pom.xml version (${pom_version})"
@@ -64,14 +69,10 @@ jobs:
           fi
 
       - name: Set up JDK
-        env:
-          GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '25'
-          cache: maven
           server-id: github
           server-username: GITHUB_ACTOR
           server-password: GITHUB_TOKEN
