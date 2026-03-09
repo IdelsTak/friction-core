@@ -115,12 +115,17 @@ Publish workflows:
 
 ## Automated Changelog Generation
 
-Objective: generate release changelogs automatically from commit messages and merged PR metadata.
+Objective: generate release changelogs automatically from the current merged PR content only.
 
 Baseline approach:
 
 - Generate changelog during release workflow from the current merged PR only.
-- Use PR title for summary and PR body for detailed release notes content.
+- Use fixed output format:
+  - `# Changelog`
+  - blank line
+  - `#<PR_NUMBER> <PR_TITLE>`
+  - blank line
+  - cleaned PR body text
 - Keep notes tightly scoped to the release-triggering PR.
 
 Recommended inputs:
@@ -138,6 +143,7 @@ Operational guardrails:
 
 - Avoid commit-range aggregation in release notes for `friction-core`.
 - Keep changelog generation deterministic and tied to the resolved merged PR.
+- If PR body is empty, keep the body section blank.
 - Do not require manual edits for normal releases; allow override for exceptional releases.
 
 ## Security and Governance Controls
