@@ -61,12 +61,15 @@ What it does:
   - Behavior: resolve semantic bump from PR labels, update `pom.xml`, commit version bump, create tag, generate changelog notes
 - `.github/workflows/publish.yml`
   - Trigger: `workflow_run` for `Release` completion
-  - Behavior: checkout latest tag, verify `pom.xml` version matches tag, publish Maven package
+  - Behavior: checkout latest tag, verify `pom.xml` version matches tag, publish Maven package via `distributionManagement`
 
 ## Authentication and Permissions
 
 - `release.yml` uses `GITHUB_TOKEN` for commit/tag/release-note operations.
 - `publish.yml` uses `PACKAGES_TOKEN` (PAT) for Maven package deployment.
+- `setup-java` writes `settings.xml` credentials for server id `github`:
+  - username source: `GITHUB_ACTOR`
+  - password source: `PACKAGES_TOKEN`
 - Recommended `PACKAGES_TOKEN` scopes:
   - `write:packages`
   - `read:packages`

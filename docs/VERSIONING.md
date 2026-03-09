@@ -48,3 +48,5 @@
 - It checks out latest semver tag and verifies:
   - `pom.xml` version == tag version
 - Publishes Maven package to GitHub Packages using `PACKAGES_TOKEN`.
+- Deploy target is defined in `pom.xml` via `<distributionManagement>` with
+  repository id `github`.
