@@ -206,18 +206,14 @@ jobs:
               .trim();
 
             const lines = [];
-            lines.push(`# ${nextTag}`);
+            lines.push("# Changelog");
             lines.push("");
-            lines.push(`## Change Summary`);
-            lines.push("");
-            lines.push(`- PR: #${pr.number} ${pr.title}`);
-            lines.push("");
-            lines.push("## Details");
+            lines.push(`#${pr.number} ${pr.title}`);
             lines.push("");
             if (cleanedBody.length) {
               lines.push(cleanedBody);
             } else {
-              lines.push("- No PR body content provided.");
+              lines.push("");
             }
 
             core.setOutput("body", lines.join("\n"));

@@ -39,10 +39,13 @@
 ## Changelog Notes
 
 - `release.yml` generates notes from the current merged PR only.
-- Notes include:
-  - `## Change Summary` with current PR number/title
-  - `## Details` from cleaned PR body content
-- If PR body is empty, release notes include a clear fallback message.
+- Notes format is fixed:
+  - `# Changelog`
+  - blank line
+  - `#<PR_NUMBER> <PR_TITLE>`
+  - blank line
+  - cleaned PR body text
+- If PR body is empty, the body section remains blank.
 - Notes are attached to the tag release metadata.
 
 ## Publishing
